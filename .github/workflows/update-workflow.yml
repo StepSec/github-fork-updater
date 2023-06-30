@@ -1,0 +1,41 @@
+name: Update the fork
+on: 
+  issues:
+    types: [labeled]
+
+jobs:
+  update-fork:
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'update-fork'
+
+    steps:
+    - uses: peter-murray/workflow-application-token-action@b1ad34e28f4ef30582df1bd5f45df2044eb7a6b9 # v2.1.0
+      if: ${{ vars.use_github_app == 'true' }}
+      id: get-workflow-token
+      with:
+        application_id: ${{ secrets.GH_AUTOMATION_ID }}
+        application_private_key: ${{ secrets.GH_AUTOMATION_PRIVATE_KEY }}
+
+    - id: get-token
+      name: Determine token to use
+      env: 
+        github_app_token: ${{ steps.get-workflow-token.outputs.token }}
+        PAT_GITHUB: ${{ secrets.PAT_GITHUB }}
+      run: |
+        if [ -n "$github_app_token" ]; then
+          echo "token=$github_app_token" >> $GITHUB_OUTPUT
+          echo "Using token from GitHub App"
+        else
+          echo "token=$PAT_GITHUB" >> $GITHUB_OUTPUT
+          echo "Using personal access token from secret 'PAT_GITHUB'"
+        fi
+
+    - uses: actions/checkout@v3
+
+    - run: |
+       echo "Found the issue that triggered this event with number [${{ github.event.issue.number }}]"
+       echo "Found the issue title [${{ github.event.issue.title }}]"
+
+    - run: |
+       .\update-fork.ps1 -orgName ${{ github.repository_owner }} -userName "xxx" -PAT ${{ steps.get-token.outputs.token }} -issueTitle "${{ github.event.issue.title }}" -issueId ${{ github.event.issue.number }} -issuesRepository  ${{ github.repository }}
+      shell: pwsh
